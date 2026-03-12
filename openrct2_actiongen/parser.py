@@ -18,6 +18,13 @@ _ACTION_NAME_RE = re.compile(
 )
 
 # 2-arg form: visitor.Visit("jsName", _member) or visitor.Visit("jsName", _member.field)
+# Matches member declarations like: ride_type_t _rideType{ kRideTypeNull };
+# Captures: (type, member_name)
+_MEMBER_DECL_RE = re.compile(
+    r"^\s+([\w:]+(?:<[\w:,\s]+>)?)\s+(_\w+)\s*(?:\{[^}]*\}|=[^;]+)?\s*;",
+    re.MULTILINE,
+)
+
 _VISIT_NAMED_RE = re.compile(
     r'visitor\.Visit\(\s*"(\w+)"\s*,\s*(\w+(?:\.\w+)?)\s*\)'
 )
@@ -96,6 +103,26 @@ def extract_visit_calls(body: str) -> list[VisitCall]:
             calls.append(VisitCall(js_name=None, member=m.group(1)))
 
     return calls
+
+
+def parse_member_types(header_path: Path) -> dict[str, str]:
+    """Parse member variable declarations from an Action header file.
+
+    Returns dict mapping member name to C++ type.
+    e.g. {"_rideType": "ride_type_t", "_origin": "CoordsXYZD", "_slope": "FootpathSlope"}
+    """
+    text = header_path.read_text()
+    matches = _MEMBER_DECL_RE.findall(text)
+    return {member: cpp_type for cpp_type, member in matches}
+
+
+def find_header_for_action(source_root: Path, class_name: str) -> Path | None:
+    """Find the .h file matching an action class name."""
+    actions_dir = source_root / "src" / "openrct2" / "actions"
+    results = list(actions_dir.glob(f"**/{class_name}.h"))
+    if results:
+        return results[0]
+    return None
 
 
 def _get_parser() -> Parser:
