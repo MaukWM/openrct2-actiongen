@@ -52,7 +52,9 @@ def _download(version: str) -> Path:
         return cache_path
 
     _check_git()
+    print(f"Downloading OpenRCT2 {version} source (sparse clone)...")
     _sparse_clone(version, cache_path)
+    print("Download complete.")
     _validate_source(cache_path)
     return cache_path
 
