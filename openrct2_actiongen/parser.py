@@ -4,9 +4,26 @@ import re
 from pathlib import Path
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
+_PLUGIN_API_VERSION_RE = re.compile(
+    r"kPluginApiVersion\s*=\s*(\d+)"
+)
+
+# Matches entries like: { "ridecreate", GameCommand::CreateRide },
 _ACTION_NAME_RE = re.compile(
     r'\{\s*"(\w+)"\s*,\s*GameCommand::(\w+)\s*\}'
 )
+
+
+def parse_plugin_api_version(source_root: Path) -> int:
+    """Parse kPluginApiVersion from ScriptEngine.h."""
+    script_engine_h = source_root / "src" / "openrct2" / "scripting" / "ScriptEngine.h"
+    text = script_engine_h.read_text()
+
+    match = _PLUGIN_API_VERSION_RE.search(text)
+    if not match:
+        raise ValueError("kPluginApiVersion not found in ScriptEngine.h")
+
+    return int(match.group(1))
 
 
 def parse_action_name_map(source_root: Path) -> dict[str, str]:
