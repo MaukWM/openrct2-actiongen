@@ -13,7 +13,7 @@ from openrct2_actiongen.ir import Action, ActionParameter, ActionsIR
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
 _PLUGIN_API_VERSION_RE = re.compile(
-    r"kPluginApiVersion\s*=\s*(\d+)"
+    r"(?:kPluginApiVersion|OPENRCT2_PLUGIN_API_VERSION)\s*=\s*(\d+)"
 )
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
