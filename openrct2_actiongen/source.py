@@ -45,22 +45,29 @@ def _use_local(path: Path) -> Path:
 
 
 def _download(version: str) -> Path:
-    """Download source via sparse clone, or return cached path."""
+    """Download source via sparse clone (or full shallow clone as fallback)."""
     cache_path = get_cache_path(version)
     if cache_path.exists():
         _validate_source(cache_path)
         return cache_path
 
-    _check_git()
-    print(f"Downloading OpenRCT2 {version} source (sparse clone)...")
-    _sparse_clone(version, cache_path)
+    git_version = _check_git()
+
+    if git_version >= MIN_GIT_VERSION:
+        print(f"Downloading OpenRCT2 {version} source (sparse clone)...")
+        _sparse_clone(version, cache_path)
+    else:
+        print(f"git {'.'.join(str(v) for v in git_version)} too old for sparse clone, "
+              f"falling back to full shallow clone...")
+        _shallow_clone(version, cache_path)
+
     print("Download complete.")
     _validate_source(cache_path)
     return cache_path
 
 
-def _check_git() -> None:
-    """Verify git is available and supports sparse clone."""
+def _check_git() -> tuple[int, ...]:
+    """Verify git is available and return its version as a tuple."""
     try:
         result = subprocess.run(
             ["git", "--version"], capture_output=True, text=True, check=True
@@ -73,12 +80,7 @@ def _check_git() -> None:
 
     # "git version 2.39.5" or "git version 2.39.5 (Apple Git-154)" -> (2, 39)
     version_str = result.stdout.strip().split()[2]
-    parts = tuple(int(x) for x in version_str.split(".")[:2])
-    if parts < MIN_GIT_VERSION:
-        raise RuntimeError(
-            f"git {version_str} is too old. "
-            f"Sparse clone requires git {MIN_GIT_VERSION[0]}.{MIN_GIT_VERSION[1]}+."
-        )
+    return tuple(int(x) for x in version_str.split(".")[:2])
 
 
 def _sparse_clone(version: str, dest: Path) -> None:
@@ -116,6 +118,29 @@ def _sparse_clone(version: str, dest: Path) -> None:
         if dest.exists():
             shutil.rmtree(dest)
         raise RuntimeError(f"Sparse clone failed for {version}: {e.stderr}") from e
+
+
+def _shallow_clone(version: str, dest: Path) -> None:
+    """Full shallow clone (fallback for git < 2.25)."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        subprocess.run(
+            [
+                "git", "clone",
+                "--depth", "1",
+                "--branch", version,
+                REPO_URL,
+                str(dest),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        if dest.exists():
+            shutil.rmtree(dest)
+        raise RuntimeError(f"Shallow clone failed for {version}: {e.stderr}") from e
 
 
 def _validate_source(source_root: Path) -> None:
