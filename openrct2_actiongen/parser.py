@@ -2,10 +2,14 @@
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import tree_sitter_cpp as tscpp
 from tree_sitter import Language, Parser
+
+from openrct2_actiongen.ir import Action, ActionParameter, ActionsIR
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
 _PLUGIN_API_VERSION_RE = re.compile(
@@ -20,6 +24,11 @@ _ACTION_NAME_RE = re.compile(
 # 2-arg form: visitor.Visit("jsName", _member) or visitor.Visit("jsName", _member.field)
 # Matches member declarations like: ride_type_t _rideType{ kRideTypeNull };
 # Captures: (type, member_name)
+# Matches: class FooAction final : public GameActionBase<GameCommand::BarBaz>
+_GAME_COMMAND_RE = re.compile(
+    r"GameActionBase<GameCommand::(\w+)>"
+)
+
 _MEMBER_DECL_RE = re.compile(
     r"^\s+([\w:]+(?:<[\w:,\s]+>)?)\s+(_\w+)\s*(?:\{[^}]*\}|=[^;]+)?\s*;",
     re.MULTILINE,
@@ -65,6 +74,75 @@ class VisitCall:
 
     js_name: str | None  # None for unnamed coordinates
     member: str          # C++ member: "_rideType", "_origin", "_slope.type"
+
+
+def parse_actions(source_root: Path, version: str) -> "ActionsIR":
+    """Parse all action definitions from OpenRCT2 source.
+
+    This is the main entry point — orchestrates all parser steps
+    and returns a complete ActionsIR ready for JSON serialization.
+    """
+    # JS action names and their corresponding GameCommand enums
+    name_map = parse_action_name_map(source_root)
+
+    api_version = parse_plugin_api_version(source_root)
+
+    # AcceptParameters method bodies keyed by class name
+    bodies = find_accept_parameters_bodies(source_root)
+    actions: list[Action] = []
+
+    # Build GameCommand → class_name map from all action headers
+    actions_dir = source_root / "src" / "openrct2" / "actions"
+    command_to_class: dict[str, tuple[str, Path]] = {}
+    for header_path in actions_dir.glob("**/*Action.h"):
+        class_name = header_path.stem
+        game_command = parse_game_command(header_path)
+        if game_command:
+            command_to_class[game_command] = (class_name, header_path)
+
+    # Iterate over JS-exposed actions (from the name map)
+    for js_name, game_command in sorted(name_map.items()):
+        if game_command not in command_to_class:
+            raise ValueError(
+                f"No action class found for {js_name} (GameCommand::{game_command}). "
+                f"Source may be corrupted or parser needs updating."
+            )
+
+        class_name, header_path = command_to_class[game_command]
+
+        # Get category from .cpp file path
+        cpp_files = list(actions_dir.glob(f"**/{class_name}.cpp"))
+        if cpp_files:
+            category = _get_category(cpp_files[0])
+        else:
+            category = "general"
+
+        # Resolve parameters (empty list if no AcceptParameters)
+        parameters: list[ActionParameter] = []
+        if class_name in bodies:
+            member_types = parse_member_types(header_path)
+            calls = extract_visit_calls(bodies[class_name])
+            resolved = resolve_params(calls, member_types)
+            parameters = [
+                ActionParameter(name=p.js_name, type=p.json_type, cpp_type=p.cpp_type)
+                for p in resolved
+            ]
+
+        actions.append(Action(
+            js_name=js_name,
+            cpp_class=class_name,
+            game_command=game_command,
+            category=category,
+            parameters=parameters,
+        ))
+
+    return ActionsIR(
+        openrct2_version=version,
+        api_version=api_version,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        generator_version=pkg_version("openrct2-actiongen"),
+        actions=actions,
+    )
 
 
 def parse_plugin_api_version(source_root: Path) -> int:
@@ -182,6 +260,30 @@ def _cpp_to_json_type(cpp_type: str) -> str:
         return _CPP_TO_JSON_TYPE[cpp_type]
     # Everything else (int32_t, uint8_t, enums, RideId, etc.) is a number
     return "number"
+
+
+def parse_game_command(header_path: Path) -> str | None:
+    """Extract the GameCommand enum name from an action header.
+
+    e.g. "GameActionBase<GameCommand::CreateRide>" → "CreateRide"
+    """
+    text = header_path.read_text()
+    match = _GAME_COMMAND_RE.search(text)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _get_category(cpp_file: Path) -> str:
+    """Derive action category from the subdirectory name.
+
+    e.g. ".../actions/ride/RideCreateAction.cpp" → "ride"
+         ".../actions/RideCreateAction.cpp" → "general"  (flat layout, pre-v0.4.32)
+    """
+    parent = cpp_file.parent.name
+    if parent == "actions":
+        return "general"
+    return parent
 
 
 def find_header_for_action(source_root: Path, class_name: str) -> Path | None:
