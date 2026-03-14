@@ -5,11 +5,11 @@ from pathlib import Path
 
 import click
 
-from openrct2_codegen.codegen import render_template
-from openrct2_codegen.ir import ActionsIR
-from openrct2_codegen.parser import parse_actions
+from openrct2_codegen.actions.codegen import render_template
+from openrct2_codegen.actions.ir import ActionsIR
+from openrct2_codegen.actions.parser import parse_actions
 from openrct2_codegen.source import get_dts_path, get_source
-from openrct2_codegen.state_parser import parse_state
+from openrct2_codegen.state.parser import parse_state
 
 
 @click.group()

@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 
-from openrct2_codegen.parser import parse_plugin_api_version
-from openrct2_codegen.state_ir import (
+from openrct2_codegen.actions.parser import parse_plugin_api_version
+from openrct2_codegen.state.ir import (
     ArrayProperty,
     EnumRefProperty,
     FlagsProperty,

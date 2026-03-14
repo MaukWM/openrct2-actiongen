@@ -16,5 +16,8 @@ build/
 # OS
 .DS_Store
 
+# Local dev scripts
+local_scripts/
+
 # Generated IR artifacts
 generated/
