@@ -1,14 +1,14 @@
-"""CLI entry point for openrct2-actiongen."""
+"""CLI entry point for openrct2-codegen."""
 
 import json
 from pathlib import Path
 
 import click
 
-from openrct2_actiongen.codegen import render_template
-from openrct2_actiongen.ir import ActionsIR
-from openrct2_actiongen.parser import parse_actions
-from openrct2_actiongen.source import get_source
+from openrct2_codegen.codegen import render_template
+from openrct2_codegen.ir import ActionsIR
+from openrct2_codegen.parser import parse_actions
+from openrct2_codegen.source import get_source
 
 
 @click.group()

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from openrct2_actiongen.ir import ActionsIR
+from openrct2_codegen.ir import ActionsIR
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 

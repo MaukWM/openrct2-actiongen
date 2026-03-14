@@ -1,7 +1,7 @@
 [project]
-name = "openrct2-actiongen"
-version = "0.1.0"
-description = "Parse OpenRCT2 C++ source to generate action binding definitions"
+name = "openrct2-codegen"
+version = "0.2.0"
+description = "Parse OpenRCT2 C++ source to generate action and state binding definitions"
 readme = "README.md"
 authors = [
     { name = "Mauk Muller", email = "mauk@elnino.tech" }
@@ -22,7 +22,7 @@ dev = [
 ]
 
 [project.scripts]
-openrct2-actiongen = "openrct2_actiongen.cli:main"
+openrct2-codegen = "openrct2_codegen.cli:main"
 
 [tool.uv]
 package = true

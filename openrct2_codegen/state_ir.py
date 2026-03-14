@@ -10,12 +10,14 @@ from pydantic import BaseModel
 # ── Properties ────────────────────────────────────────────────────────
 #
 # A property is one entry inside an interface definition.
-# Four kinds:
+# Six kinds:
 #   scalar    — a primitive value: number, boolean, string
-#   array     — a list of items belonging to another interface
+#   array     — a list of items (interface or enum); item_kind disambiguates
 #   interface — a single nested interface (not an array)
 #   flags     — synthesized from getFlag(flag: SomeUnion): boolean
 #   enum_ref  — a field whose type is a string union enum
+#   union     — a discriminated union of interfaces (e.g. ResearchItem);
+#               is_array=True for ResearchItem[]
 
 
 class ScalarProperty(BaseModel):
@@ -29,7 +31,8 @@ class ArrayProperty(BaseModel):
     ir_type: Literal["array"]
     name: str
     ts_type: str                 # e.g. "Award[]"
-    item_interface: str          # e.g. "Award"
+    item_type: str               # e.g. "Award" or "ResearchCategory"
+    item_kind: Literal["interface", "enum"]  # what item_type refers to
 
 
 class InterfaceProperty(BaseModel):
@@ -54,8 +57,26 @@ class EnumRefProperty(BaseModel):
     optional: bool = False
 
 
+class UnionProperty(BaseModel):
+    ir_type: Literal["union"]
+    name: str
+    ts_type: str                 # original TS type string, e.g. "ResearchItem[]"
+    union_name: str              # the type alias, e.g. "ResearchItem"
+    variants: list[str]          # interface names, e.g. ["RideResearchItem", "SceneryResearchItem"]
+    discriminator: str | None    # discriminating field name if detected, e.g. "type"
+    is_array: bool = False       # True for ResearchItem[]
+    optional: bool = False       # True for ResearchItem | null
+
+
 Property = Annotated[
-    Union[ScalarProperty, ArrayProperty, InterfaceProperty, FlagsProperty, EnumRefProperty],
+    Union[
+        ScalarProperty,
+        ArrayProperty,
+        InterfaceProperty,
+        FlagsProperty,
+        EnumRefProperty,
+        UnionProperty,
+    ],
     ...,
 ]
 
@@ -92,5 +113,6 @@ class StateIR(BaseModel):
     generated_at: str
     generator_version: str
     namespaces: list[Namespace]
-    interfaces: dict[str, Interface]   # keyed by interface name
-    enums: dict[str, list[str]]        # keyed by enum/union name → list of values
+    interfaces: dict[str, Interface]        # keyed by interface name
+    enums: dict[str, list[str]]             # string union types → list of values
+    interface_unions: dict[str, list[str]]  # e.g. "ResearchItem" → ["RideResearchItem", "SceneryResearchItem"]

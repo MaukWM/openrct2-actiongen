@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 REPO_URL = "https://github.com/OpenRCT2/OpenRCT2.git"
-CACHE_DIR = Path.home() / ".cache" / "openrct2-actiongen"
+CACHE_DIR = Path.home() / ".cache" / "openrct2-codegen"
 
 # Minimum expected files — sanity check after download
 MIN_ACTION_FILES = 50

@@ -9,7 +9,7 @@ from pathlib import Path
 import tree_sitter_cpp as tscpp
 from tree_sitter import Language, Parser
 
-from openrct2_actiongen.ir import Action, ActionParameter, ActionsIR
+from openrct2_codegen.ir import Action, ActionParameter, ActionsIR
 
 # Matches entries like: { "ridecreate", GameCommand::CreateRide },
 _PLUGIN_API_VERSION_RE = re.compile(
@@ -140,7 +140,7 @@ def parse_actions(source_root: Path, version: str) -> "ActionsIR":
         openrct2_version=version,
         api_version=api_version,
         generated_at=datetime.now(timezone.utc).isoformat(),
-        generator_version=pkg_version("openrct2-actiongen"),
+        generator_version=pkg_version("openrct2-codegen"),
         actions=actions,
     )
 
