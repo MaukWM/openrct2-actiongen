@@ -1,5 +1,6 @@
 """Render Jinja2 templates from an ActionsIR."""
 
+import re
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -7,6 +8,35 @@ from jinja2 import Environment, FileSystemLoader
 from openrct2_actiongen.ir import ActionsIR
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def _cpp_class_to_method(cpp_class: str) -> str:
+    """Convert a C++ action class name to a Python method name.
+
+    RideCreateAction -> ride_create
+    BalloonPressAction -> balloon_press
+    """
+    name = cpp_class.removesuffix("Action")
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name).lower()
+
+
+def _camel_to_snake(name: str) -> str:
+    """Convert a camelCase parameter name to snake_case.
+
+    primaryColour -> primary_colour
+    rideType -> ride_type
+    """
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name).lower()
+
+
+def _ir_type_to_py(ir_type: str) -> str:
+    """Map an IR type string to a Python type annotation string.
+
+    number -> int
+    boolean -> bool
+    string -> str
+    """
+    return {"number": "int", "boolean": "bool", "string": "str"}[ir_type]
 
 
 def render_template(template_name: str, ir: ActionsIR) -> str:
@@ -25,6 +55,9 @@ def render_template(template_name: str, ir: ActionsIR) -> str:
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    env.filters["cpp_class_to_method"] = _cpp_class_to_method
+    env.filters["camel_to_snake"] = _camel_to_snake
+    env.filters["ir_type_to_py"] = _ir_type_to_py
     template = env.get_template(j2_file.name)
 
     return template.render(
