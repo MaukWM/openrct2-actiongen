@@ -5,10 +5,12 @@ from pathlib import Path
 
 import click
 
-from openrct2_codegen.actions.codegen import render_template
+import openrct2_codegen.actions.codegen as actions_codegen
+import openrct2_codegen.state.codegen as state_codegen
 from openrct2_codegen.actions.ir import ActionsIR
 from openrct2_codegen.actions.parser import parse_actions
 from openrct2_codegen.source import get_dts_path, get_source
+from openrct2_codegen.state.ir import StateIR
 from openrct2_codegen.state.parser import parse_state
 
 
@@ -74,19 +76,25 @@ def generate(
     click.echo(f"state.json  → {state_out}")
 
 
+_ACTIONS_TEMPLATES = {"actions.ts", "actions.py"}
+_STATE_TEMPLATES = {"queries.ts"}
+
+
 @main.command()
 @click.option(
-    "--ir",
-    type=click.Path(exists=True, path_type=Path),
-    default=Path("generated/actions.json"),
-    show_default=True,
-    help="Path to actions.json IR file.",
-)
-@click.option(
     "--template",
-    type=click.Choice(["actions.ts", "actions.py"]),
+    type=click.Choice(sorted(_ACTIONS_TEMPLATES | _STATE_TEMPLATES)),
     required=True,
     help="Template to render.",
+)
+@click.option(
+    "--ir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Path to IR file. Defaults to generated/actions.json for actions templates, "
+        "generated/state.json for state templates."
+    ),
 )
 @click.option(
     "--out",
@@ -95,15 +103,26 @@ def generate(
     help="Output path. Defaults to generated/<template>.",
 )
 def render(
-    ir: Path,
     template: str,
+    ir: Path | None,
     out: Path | None,
 ) -> None:
     """Render a codegen template from an IR file."""
     out = out or Path("generated") / template
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    actions_ir = ActionsIR.model_validate_json(ir.read_text())
-    rendered = render_template(template, actions_ir)
+    if template in _STATE_TEMPLATES:
+        ir = ir or Path("generated/state.json")
+        if not ir.exists():
+            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+        state_ir = StateIR.model_validate_json(ir.read_text())
+        rendered = state_codegen.render_template(template, state_ir)
+    else:
+        ir = ir or Path("generated/actions.json")
+        if not ir.exists():
+            raise click.ClickException(f"IR file not found: {ir} — run 'generate' first.")
+        actions_ir = ActionsIR.model_validate_json(ir.read_text())
+        rendered = actions_codegen.render_template(template, actions_ir)
+
     out.write_text(rendered)
     click.echo(f"{template} → {out}")
