@@ -32,11 +32,11 @@ class {{ action.cpp_class | replace("Action", "Params") }}(BaseModel):
 # Actions mixin — inherited by RCT2
 # ---------------------------------------------------------------------------
 
-class _ActionsMixin:
+class ActionsProxy:
     """Auto-generated game action methods. Do not edit."""
 
-    def execute(self, endpoint: str, params: dict | BaseModel | None = None) -> dict:
-        raise NotImplementedError  # provided by RCT2
+    def __init__(self, client) -> None:
+        self._client = client
 {% for action in actions %}
 
     def {{ action.cpp_class | cpp_class_to_method }}(
@@ -46,7 +46,7 @@ class _ActionsMixin:
 {% endfor %}
     ) -> dict:
 {% if action.parameters %}
-        return self.execute(
+        return self._client.execute(
             "{{ action.js_name }}",
             {{ action.cpp_class | replace("Action", "Params") }}(
 {% for p in action.parameters %}
@@ -55,6 +55,6 @@ class _ActionsMixin:
             ),
         )
 {% else %}
-        return self.execute("{{ action.js_name }}")
+        return self._client.execute("{{ action.js_name }}")
 {% endif %}
 {% endfor %}

@@ -57,20 +57,23 @@ class {{ ns.ts_interface }}(BaseModel):
 {% endfor %}
 {% endfor %}
 
-# ── Queries mixin ─────────────────────────────────────────────────────────────
+# ── State proxy ───────────────────────────────────────────────────────────────
 
-class _QueriesMixin:
-    """Typed query methods for all state endpoints.
+class StateProxy:
+    """Typed query methods for all state endpoints. Do not edit."""
 
-    Expects self._query(endpoint: str) -> Any on the concrete class.
-    """
+    def __init__(self, client) -> None:
+        self._client = client
+
+    def _query(self, endpoint: str) -> Any:
+        return self._client._query(endpoint)
 {% for ns in namespaces %}
 
-    def query_{{ ns.name }}(self) -> {{ ns.ts_interface }}:
+    def {{ ns.name }}(self) -> {{ ns.ts_interface }}:
         return {{ ns.ts_interface }}.model_validate(self._query("{{ ns.name }}"))
 {% for prop in ns.properties %}
 
-    def query_{{ ns.name }}_{{ prop.name | camel_to_snake }}(self) -> {{ prop | py_type }}:
+    def {{ ns.name }}_{{ prop.name | camel_to_snake }}(self) -> {{ prop | py_type }}:
 {% if prop.ir_type == "scalar" or prop.ir_type == "enum_ref" %}
         return self._query("{{ ns.name }}.{{ prop.name }}")
 {% elif prop.ir_type == "flags" %}
